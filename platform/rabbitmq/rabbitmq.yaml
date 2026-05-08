@@ -57,8 +57,24 @@ spec:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
         effect: "NoSchedule"
-      securityContext:
-        fsGroup: 999
+      initContainers:
+      - name: fix-rabbitmq-permissions
+        image: registry.local:30500/library/busybox:1.36.1
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - |
+          set -eux
+          chown -R 999:999 /var/lib/rabbitmq || true
+          if [ -f /var/lib/rabbitmq/.erlang.cookie ]; then
+            chown 999:999 /var/lib/rabbitmq/.erlang.cookie
+            chmod 600 /var/lib/rabbitmq/.erlang.cookie
+            ls -l /var/lib/rabbitmq/.erlang.cookie
+          fi
+        volumeMounts:
+        - name: rabbitmq-data
+          mountPath: /var/lib/rabbitmq
       containers:
       - name: rabbitmq
         image: registry.local:30500/library/rabbitmq:3.13-management
