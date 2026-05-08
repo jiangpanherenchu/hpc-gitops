@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smoke-test-config
+  namespace: smoke-test
+data:
+  message: "hello from jiangpanherenchu hpc-gitops"
+  repo: "hpc-gitops"
+  managed-by: "argocd"
