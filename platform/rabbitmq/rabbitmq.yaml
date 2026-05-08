@@ -3,12 +3,42 @@ kind: Namespace
 metadata:
   name: messaging
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-enabled-plugins
+  namespace: messaging
+data:
+  enabled_plugins: |
+    [rabbitmq_management,rabbitmq_prometheus].
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-headless
+  namespace: messaging
+spec:
+  clusterIP: None
+  selector:
+    app: rabbitmq
+  ports:
+  - name: amqp
+    port: 5672
+    targetPort: 5672
+  - name: management
+    port: 15672
+    targetPort: 15672
+  - name: metrics
+    port: 15692
+    targetPort: 15692
+---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: rabbitmq
   namespace: messaging
 spec:
+  serviceName: rabbitmq-headless
   replicas: 1
   selector:
     matchLabels:
@@ -27,6 +57,8 @@ spec:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
         effect: "NoSchedule"
+      securityContext:
+        fsGroup: 999
       containers:
       - name: rabbitmq
         image: registry.local:30500/library/rabbitmq:3.13-management
@@ -38,17 +70,32 @@ spec:
           containerPort: 15672
         - name: metrics
           containerPort: 15692
+        env:
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: RABBITMQ_NODENAME
+          value: "rabbit@$(MY_POD_NAME)"
+        - name: RABBITMQ_USE_LONGNAME
+          value: "false"
         envFrom:
         - secretRef:
             name: rabbitmq-auth
         volumeMounts:
         - name: rabbitmq-data
           mountPath: /var/lib/rabbitmq
+        - name: rabbitmq-enabled-plugins
+          mountPath: /etc/rabbitmq/enabled_plugins
+          subPath: enabled_plugins
       volumes:
       - name: rabbitmq-data
         hostPath:
-          path: /data/rabbitmq
+          path: /data/rabbitmq-stateful
           type: DirectoryOrCreate
+      - name: rabbitmq-enabled-plugins
+        configMap:
+          name: rabbitmq-enabled-plugins
 ---
 apiVersion: v1
 kind: Service
