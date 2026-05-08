@@ -89,13 +89,19 @@ spec:
           mountPath: /etc/rabbitmq/enabled_plugins
           subPath: enabled_plugins
       volumes:
-      - name: rabbitmq-data
-        hostPath:
-          path: /data/rabbitmq-stateful
-          type: DirectoryOrCreate
       - name: rabbitmq-enabled-plugins
         configMap:
           name: rabbitmq-enabled-plugins
+  volumeClaimTemplates:
+  - metadata:
+      name: rabbitmq-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: openebs-hostpath
+      resources:
+        requests:
+          storage: 5Gi
 ---
 apiVersion: v1
 kind: Service
