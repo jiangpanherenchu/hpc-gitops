@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: messaging
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: messaging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      nodeSelector:
+        rabbitmq-node: "true"
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: rabbitmq
+        image: registry.local:30500/library/rabbitmq:3.13-management
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: amqp
+          containerPort: 5672
+        - name: management
+          containerPort: 15672
+        - name: metrics
+          containerPort: 15692
+        envFrom:
+        - secretRef:
+            name: rabbitmq-auth
+        volumeMounts:
+        - name: rabbitmq-data
+          mountPath: /var/lib/rabbitmq
+      volumes:
+      - name: rabbitmq-data
+        hostPath:
+          path: /data/rabbitmq
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-service
+  namespace: messaging
+spec:
+  type: NodePort
+  selector:
+    app: rabbitmq
+  ports:
+  - name: amqp
+    port: 5672
+    targetPort: 5672
+    nodePort: 30672
+  - name: management
+    port: 15672
+    targetPort: 15672
+    nodePort: 31672
+  - name: metrics
+    port: 15692
+    targetPort: 15692
+    nodePort: 31692
